@@ -1,0 +1,17 @@
+# Ignorar archivos de configuración y credenciales
+.env
+Credenciales_API.json
+credentials_mail.json
+token.json
+insider_trading.log
+scheduled_mail.log
+Credenciales_APIompras.csv
+ventas.csv
+transacciones_compras.csv
+transacciones_ventas.csv
+authorize.py
+
+# Ignorar archivos de caché de Python
+__pycache__/
+*.pyc
+
