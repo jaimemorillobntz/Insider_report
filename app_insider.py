@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from Insider_trading import obtener_transacciones_insiders, dividir_compras_ventas, filtrar_por_fecha, formatear_fecha, crear_resumen
+from Insider_trading_secrets import obtener_transacciones_insiders, dividir_compras_ventas, filtrar_por_fecha, formatear_fecha, crear_resumen
 
 # Título de la aplicación
 st.title('Análisis de Transacciones de Insiders')
@@ -8,7 +8,7 @@ st.title('Análisis de Transacciones de Insiders')
 # Instrucciones para el usuario
 st.write("""
     Esta aplicación permite visualizar las transacciones de insiders de empresas listadas.
-    Selecciona el ticker de la empresa y el número de días para filtrar las transacciones recientes.
+    Selecciona el ticker de la empresa y el número de días para filtrar las transacciones más recientes.
 """)
 
 # Entrada de usuario: seleccionar tickers
