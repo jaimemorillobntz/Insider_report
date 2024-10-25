@@ -51,7 +51,7 @@ def obtener_transacciones_insiders(ticker):
     url = f'https://finnhub.io/api/v1/stock/insider-transactions?symbol={ticker}&token={api_key}'
     response = requests.get(url)
     
-    if response.status_code == 200:
+    try:
         data = response.json().get('data', [])
         if not data:
             logging.info(f"No hay datos disponibles para {ticker}.")
@@ -66,34 +66,50 @@ def obtener_transacciones_insiders(ticker):
         df_limpio['Ticker'] = ticker
         logging.info(f"Transacciones de {ticker} obtenidas correctamente.")
         return df_limpio
-    else:
-        logging.error(f"Error al obtener datos para {ticker}: {response.status_code}")
+    except json.JSONDecodeError:
+        logging.error(f"Error al decodificar JSON para {ticker}.")
+        return pd.DataFrame()
+    except Exception as e:
+        logging.error(f"Error desconocido para {ticker}: {e}")
         return pd.DataFrame()
 
-# Función para obtener el total de acciones en circulación usando yfinance
+
 def obtener_acciones_totales(ticker):
     accion = yf.Ticker(ticker)
     try:
-        total_acciones = accion.info['sharesOutstanding']
+        # Verifica si la clave 'sharesOutstanding' está en la info
+        total_acciones = accion.info.get('sharesOutstanding', None)
+        if total_acciones is None:
+            logging.warning(f"No se encontró 'sharesOutstanding' para {ticker}. Valor predeterminado usado.")
+            return 0  # Devuelve un valor predeterminado o maneja según sea necesario
         logging.info(f"Total de acciones obtenido para {ticker}: {total_acciones}")
         return total_acciones
-    except KeyError:
-        logging.error(f"No se pudo obtener el número total de acciones para {ticker}.")
-        return None
+    except json.JSONDecodeError:
+        logging.error(f"Error de decodificación JSON para {ticker}.")
+        return 0  # Valor predeterminado en caso de error
+    except Exception as e:
+        logging.error(f"Error desconocido al obtener el número total de acciones para {ticker}: {e}")
+        return 0
 
 # Función para crear resúmenes
 def crear_resumen(df_compras, df_ventas):
     resumen_compras = df_compras.groupby('Ticker').agg({'Cantidad': 'sum', 'Precio de Transacción': 'mean'}).reset_index()
     resumen_compras['Precio de Transacción'] = resumen_compras['Precio de Transacción'].round(2)
     resumen_compras['Total Acciones'] = resumen_compras['Ticker'].apply(obtener_acciones_totales)
-    resumen_compras['Porcentaje Comprado'] = ((resumen_compras['Cantidad'] / resumen_compras['Total Acciones']) * 100).round(6)
+    resumen_compras['Porcentaje Comprado'] = resumen_compras.apply(
+        lambda row: (row['Cantidad'] / row['Total Acciones'] * 100) if row['Total Acciones'] > 0 else 0,
+        axis=1
+    )
     resumen_compras.columns = ['Ticker', 'Total Comprado', 'Precio Medio Compra', 'Porcentaje Comprado', 'Total Acciones']
     resumen_compras = resumen_compras[['Ticker', 'Total Comprado', 'Precio Medio Compra', 'Porcentaje Comprado', 'Total Acciones']]
     
     resumen_ventas = df_ventas.groupby('Ticker').agg({'Cantidad': 'sum', 'Precio de Transacción': 'mean'}).reset_index()
     resumen_ventas['Precio de Transacción'] = resumen_ventas['Precio de Transacción'].round(2)
     resumen_ventas['Total Acciones'] = resumen_ventas['Ticker'].apply(obtener_acciones_totales)
-    resumen_ventas['Porcentaje Vendido'] = ((resumen_ventas['Cantidad'].abs() / resumen_ventas['Total Acciones']) * 100).round(6)
+    resumen_ventas['Porcentaje Vendido'] = resumen_ventas.apply(
+        lambda row: (abs(row['Cantidad']) / row['Total Acciones'] * 100) if row['Total Acciones'] > 0 else 0,
+        axis=1
+    )
     resumen_ventas.columns = ['Ticker', 'Total Vendido', 'Precio Medio Venta', 'Porcentaje Vendido', 'Total Acciones']
     resumen_ventas = resumen_ventas[['Ticker', 'Total Vendido', 'Precio Medio Venta', 'Porcentaje Vendido', 'Total Acciones']]
     
