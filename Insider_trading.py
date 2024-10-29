@@ -7,8 +7,6 @@ import yfinance as yf
 import gspread
 from gspread_dataframe import set_with_dataframe
 from oauth2client.service_account import ServiceAccountCredentials
-import schedule
-import time
 import logging
 
 # Configuración de logging
@@ -49,7 +47,7 @@ def obtener_transacciones_insiders(ticker):
     url = f'https://finnhub.io/api/v1/stock/insider-transactions?symbol={ticker}&token={api_key}'
     response = requests.get(url)
     
-    if response.status_code == 200:
+    try:
         data = response.json().get('data', [])
         if not data:
             logging.info(f"No hay datos disponibles para {ticker}.")
@@ -64,38 +62,86 @@ def obtener_transacciones_insiders(ticker):
         df_limpio['Ticker'] = ticker
         logging.info(f"Transacciones de {ticker} obtenidas correctamente.")
         return df_limpio
-    else:
-        logging.error(f"Error al obtener datos para {ticker}: {response.status_code}")
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Error de red al obtener datos para {ticker}: {e}")
+        return pd.DataFrame()
+    except Exception as e:
+        logging.error(f"Error desconocido para {ticker}: {e}")
         return pd.DataFrame()
 
-# Función para obtener el total de acciones en circulación usando yfinance
-def obtener_acciones_totales(ticker):
-    accion = yf.Ticker(ticker)
-    try:
-        total_acciones = accion.info['sharesOutstanding']
-        logging.info(f"Total de acciones obtenido para {ticker}: {total_acciones}")
-        return total_acciones
-    except KeyError:
-        logging.error(f"No se pudo obtener el número total de acciones para {ticker}.")
-        return None
+# Función para obtener acciones totales para múltiples tickers
+def obtener_acciones_totales(tickers):
+    resultados = {}
+    for ticker in tickers:
+        accion = yf.Ticker(ticker)
+        try:
+            # 1. Intenta obtener `sharesOutstanding`, que es el más confiable.
+            total_acciones = accion.info.get('sharesOutstanding')
+            if total_acciones is not None:
+                logging.info(f"Total de acciones ('sharesOutstanding') obtenido para {ticker}: {total_acciones}")
+                resultados[ticker] = total_acciones
+                continue
+            
+            # 2. Si `sharesOutstanding` es None, intenta con `totalSharesOutstanding`.
+            total_acciones = accion.info.get('totalSharesOutstanding')
+            if total_acciones is not None:
+                logging.info(f"Total de acciones ('totalSharesOutstanding') obtenido para {ticker}: {total_acciones}")
+                resultados[ticker] = total_acciones
+                continue
+            
+            # 3. Si `totalSharesOutstanding` también es None, intenta con `floatShares`.
+            total_acciones = accion.info.get('floatShares')
+            if total_acciones is not None:
+                logging.info(f"Total de acciones ('floatShares') obtenido para {ticker}: {total_acciones}")
+                resultados[ticker] = total_acciones
+                continue
+            
+            # 4. Si `floatShares` es None, calcula estimación usando `marketCap` / `currentPrice`.
+            market_cap = accion.info.get('marketCap')
+            current_price = accion.info.get('currentPrice')
+            if market_cap is not None and current_price is not None:
+                total_acciones_calculado = market_cap / current_price
+                logging.info(f"Estimación de acciones calculada para {ticker} usando 'marketCap' y 'currentPrice': {total_acciones_calculado}")
+                resultados[ticker] = int(total_acciones_calculado)
+                continue
 
-# Función para crear resúmenes
-def crear_resumen(df_compras, df_ventas):
-    resumen_compras = df_compras.groupby('Ticker').agg({'Cantidad': 'sum', 'Precio de Transacción': 'mean'}).reset_index()
-    resumen_compras['Precio de Transacción'] = resumen_compras['Precio de Transacción'].round(2)
-    resumen_compras['Total Acciones'] = resumen_compras['Ticker'].apply(obtener_acciones_totales)
-    resumen_compras['Porcentaje Comprado'] = ((resumen_compras['Cantidad'] / resumen_compras['Total Acciones']) * 100).round(6)
-    resumen_compras.columns = ['Ticker', 'Total Comprado', 'Precio Medio Compra', 'Porcentaje Comprado', 'Total Acciones']
-    resumen_compras = resumen_compras[['Ticker', 'Total Comprado', 'Precio Medio Compra', 'Porcentaje Comprado', 'Total Acciones']]
+            # Si ninguna de las opciones devuelve un valor, lanza una advertencia y retorna 0.
+            logging.warning(f"No se encontró información sobre el total de acciones para {ticker}. Valor predeterminado usado.")
+            resultados[ticker] = 0
+            
+        except Exception as e:
+            logging.error(f"Error desconocido al obtener el número total de acciones para {ticker}: {e}")
+            resultados[ticker] = f"Error: {str(e)}"
+
+    return resultados
+
+# Función para crear resúmenes de compras y ventas
+def crear_resumen(df_compras, df_ventas, total_acciones):
+    def calcular_porcentaje(cantidad, total_acciones):
+        return ((abs(cantidad) / total_acciones)) * 100 if total_acciones > 0 else 0
+
+    def procesar_resumen(df, tipo):
+        resumen = df.groupby('Ticker').agg({'Cantidad': 'sum', 'Precio de Transacción': 'mean'}).reset_index()
+        resumen['Precio de Transacción'] = resumen['Precio de Transacción'].round(2)
+
+        # Agrego la columna de total de acciones utilizando la función obtener_acciones_totales()
+        resumen['Total Acciones'] = resumen['Ticker'].apply(lambda x: total_acciones.get(x, 0))
+
+        resumen[f'Porcentaje {tipo}'] = resumen.apply(
+            lambda row: calcular_porcentaje(row['Cantidad'], row['Total Acciones']),
+            axis=1
+        )
     
-    resumen_ventas = df_ventas.groupby('Ticker').agg({'Cantidad': 'sum', 'Precio de Transacción': 'mean'}).reset_index()
-    resumen_ventas['Precio de Transacción'] = resumen_ventas['Precio de Transacción'].round(2)
-    resumen_ventas['Total Acciones'] = resumen_ventas['Ticker'].apply(obtener_acciones_totales)
-    resumen_ventas['Porcentaje Vendido'] = ((resumen_ventas['Cantidad'].abs() / resumen_ventas['Total Acciones']) * 100).round(6)
-    resumen_ventas.columns = ['Ticker', 'Total Vendido', 'Precio Medio Venta', 'Porcentaje Vendido', 'Total Acciones']
-    resumen_ventas = resumen_ventas[['Ticker', 'Total Vendido', 'Precio Medio Venta', 'Porcentaje Vendido', 'Total Acciones']]
-    
+        resumen[f'Porcentaje {tipo}'] = resumen[f'Porcentaje {tipo}'].round(5)
+        resumen.columns = ['Ticker', f'Total {tipo}', f'Precio Medio {tipo}', f'Porcentaje {tipo}', 'Total Acciones']
+
+        return resumen[['Ticker', f'Total {tipo}', f'Precio Medio {tipo}', f'Porcentaje {tipo}', 'Total Acciones']]
+
+    resumen_compras = procesar_resumen(df_compras, 'Comprado')
+    resumen_ventas = procesar_resumen(df_ventas, 'Vendido')
+
     logging.info("Resúmenes de compras y ventas creados correctamente.")
+    
     return resumen_compras, resumen_ventas
 
 # Función para obtener transacciones de múltiples tickers
@@ -115,9 +161,10 @@ def dividir_compras_ventas(df):
     return df_compras, df_ventas
 
 # Función para filtrar transacciones por fecha
-def filtrar_por_fecha(df, dias=15):
+days = 15
+def filtrar_por_fecha(df, dias=days):
     fecha_limite = (datetime.now() - timedelta(days=dias)).date()
-    df['Fecha de Transacción'] = pd.to_datetime(df['Fecha de Transacción']).dt.date
+    df['Fecha de Transacción'] = pd.to_datetime(df['Fecha de Transacción'], errors='coerce').dt.date
     df_filtrado = df[df['Fecha de Transacción'] >= fecha_limite]
     logging.info(f"Transacciones filtradas para los últimos {dias} días.")
     return df_filtrado
@@ -152,7 +199,7 @@ def guardar_en_google_sheets(df_compras, df_ventas, resumen_compras, resumen_ven
         logging.error(f"Error al guardar en Google Sheets: {e}")
 
 # Ejemplo de uso con varios tickers
-tickers = ['ASML','ULTA','TXN','POOL','MSFT', 'MC','DHR','AAPL','SOM']
+tickers = ['ASML','ULTA','TXN','POOL','MSFT', 'MC','DHR','AAPL','SOM','NVDA','AAPL','GOOGL']
 
 def automatizar_proceso(tickers):
     try:
@@ -162,21 +209,16 @@ def automatizar_proceso(tickers):
         df_ventas = filtrar_por_fecha(df_ventas)
         df_compras = formatear_fecha(df_compras)
         df_ventas = formatear_fecha(df_ventas)
-        resumen_compras, resumen_ventas = crear_resumen(df_compras, df_ventas)
+
+        # Obtener el total de acciones para todos los tickers
+        total_acciones = obtener_acciones_totales(tickers)
+
+        resumen_compras, resumen_ventas = crear_resumen(df_compras, df_ventas, total_acciones)
         guardar_en_google_sheets(df_compras, df_ventas, resumen_compras, resumen_ventas)
         logging.info("Proceso de automatización completado exitosamente.")
     except Exception as e:
         logging.error(f"Error en el proceso de automatización: {e}")
 
+# Ejecutar el proceso
 automatizar_proceso(tickers)
-
-# Automatización diaria a las 10:30
-#schedule.every().day.at("10:30").do(automatizar_proceso, tickers)
-
-# Bucle para mantener el scheduler activo
-#if __name__ == "__main__":
-    #while True:
-        #schedule.run_pending()
-        #time.sleep(60)
-
 
