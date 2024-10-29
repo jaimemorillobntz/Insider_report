@@ -210,22 +210,35 @@ def guardar_en_google_sheets(df_compras, df_ventas, resumen_compras, resumen_ven
 # Ejemplo de uso con varios tickers
 tickers = ['ASML','ULTA','TXN','POOL','MSFT', 'MC','DHR','AAPL','SOM','NVDA','AAPL','GOOGL']
 
+# Ejecutar el proceso
 def automatizar_proceso(tickers):
     try:
+        # Paso 1: Obtener transacciones y dividir en compras/ventas
         df_transacciones = obtener_transacciones_multiples_tickers(tickers)
         df_compras, df_ventas = dividir_compras_ventas(df_transacciones)
+        
+        # Paso 2: Filtrar y formatear
         df_compras = filtrar_por_fecha(df_compras)
         df_ventas = filtrar_por_fecha(df_ventas)
         df_compras = formatear_fecha(df_compras)
         df_ventas = formatear_fecha(df_ventas)
+        
+        # Paso 3: Obtener total de acciones
         total_acciones = obtener_acciones_totales(tickers)
+        if not total_acciones:
+            logging.error("total_acciones está vacío. Revisa la función obtener_acciones_totales.")
+            return
+
+        # Paso 4: Crear resúmenes de compras y ventas con el total de acciones
         resumen_compras, resumen_ventas = crear_resumen(df_compras, df_ventas, total_acciones)
 
+        # Paso 5: Guardar resultados en Google Sheets
         guardar_en_google_sheets(df_compras, df_ventas, resumen_compras, resumen_ventas)
         logging.info("Proceso de automatización completado exitosamente.")
     except Exception as e:
         logging.error(f"Error en el proceso de automatización: {e}")
 
-# Ejecutar el proceso
+# Llamar a la función de automatización
 automatizar_proceso(tickers)
+
 
