@@ -9,6 +9,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 import logging
 import streamlit as st
 import json
+import time
 
 # Configuración de logging
 logging.basicConfig(
@@ -82,6 +83,7 @@ def obtener_acciones_totales(tickers):
             if total_acciones is not None:
                 logging.info(f"Total de acciones ('sharesOutstanding') obtenido para {ticker}: {total_acciones}")
                 resultados[ticker] = total_acciones
+                time.sleep(1)
                 continue
             
             # 2. Si `sharesOutstanding` es None, intenta con `totalSharesOutstanding`.
@@ -89,6 +91,7 @@ def obtener_acciones_totales(tickers):
             if total_acciones is not None:
                 logging.info(f"Total de acciones ('totalSharesOutstanding') obtenido para {ticker}: {total_acciones}")
                 resultados[ticker] = total_acciones
+                time.sleep(1)
                 continue
             
             # 3. Si `totalSharesOutstanding` también es None, intenta con `floatShares`.
@@ -96,6 +99,7 @@ def obtener_acciones_totales(tickers):
             if total_acciones is not None:
                 logging.info(f"Total de acciones ('floatShares') obtenido para {ticker}: {total_acciones}")
                 resultados[ticker] = total_acciones
+                time.sleep(1)
                 continue
             
             # 4. Si `floatShares` es None, calcula estimación usando `marketCap` / `currentPrice`.
@@ -105,15 +109,18 @@ def obtener_acciones_totales(tickers):
                 total_acciones_calculado = market_cap / current_price
                 logging.info(f"Estimación de acciones calculada para {ticker} usando 'marketCap' y 'currentPrice': {total_acciones_calculado}")
                 resultados[ticker] = int(total_acciones_calculado)
+                time.sleep(1)
                 continue
 
             # Si ninguna de las opciones devuelve un valor, lanza una advertencia y retorna 0.
             logging.warning(f"No se encontró información sobre el total de acciones para {ticker}. Valor predeterminado usado.")
             resultados[ticker] = 0
+            time.sleep(1)
             
         except Exception as e:
             logging.error(f"Error desconocido al obtener el número total de acciones para {ticker}: {e}")
             resultados[ticker] = f"Error: {str(e)}"
+            time.sleep(1)
 
     return resultados
 
@@ -208,16 +215,12 @@ def guardar_en_google_sheets(df_compras, df_ventas, resumen_compras, resumen_ven
 # Ejemplo de uso con varios tickers
 tickers = ['ASML','ULTA','TXN','POOL','MSFT', 'MC','DHR','AAPL','SOM','NVDA']
 
+# Ejecutar el proceso
 def automatizar_proceso(tickers):
     try:
         # Paso 1: Obtener transacciones y dividir en compras/ventas
         df_transacciones = obtener_transacciones_multiples_tickers(tickers)
         df_compras, df_ventas = dividir_compras_ventas(df_transacciones)
-        
-        # Verificación de datos en df_compras y df_ventas
-        if df_compras.empty or df_ventas.empty:
-            logging.warning("No hay datos en df_compras o df_ventas.")
-            return
         
         # Paso 2: Filtrar y formatear
         df_compras = filtrar_por_fecha(df_compras)
@@ -227,12 +230,9 @@ def automatizar_proceso(tickers):
         
         # Paso 3: Obtener total de acciones
         total_acciones = obtener_acciones_totales(tickers)
-        
-        # Verificar el contenido de `total_acciones`
-        logging.debug(f"Contenido de total_acciones antes de crear el resumen: {total_acciones}")
-        if not total_acciones or all(v == 0 for v in total_acciones.values()):
-            logging.error("Error: total_acciones está vacío o tiene valores nulos.")
-            return  # Salimos del proceso si total_acciones está vacío o con valores nulos
+        if not total_acciones:
+            logging.error("total_acciones está vacío. Revisa la función obtener_acciones_totales.")
+            return
 
         # Paso 4: Crear resúmenes de compras y ventas con el total de acciones
         resumen_compras, resumen_ventas = crear_resumen(df_compras, df_ventas, total_acciones)
@@ -242,9 +242,8 @@ def automatizar_proceso(tickers):
         logging.info("Proceso de automatización completado exitosamente.")
     except Exception as e:
         logging.error(f"Error en el proceso de automatización: {e}")
-        
+
 # Llamar a la función de automatización
 automatizar_proceso(tickers)
-
 
 
