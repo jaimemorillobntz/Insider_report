@@ -1,14 +1,11 @@
 import requests
 import pandas as pd
-import os
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 import yfinance as yf
 import gspread
 from gspread_dataframe import set_with_dataframe
 from oauth2client.service_account import ServiceAccountCredentials
-import schedule
-import time
 import logging
 import streamlit as st
 import json
@@ -93,27 +90,39 @@ def obtener_acciones_totales(ticker):
 
 # Función para crear resúmenes
 def crear_resumen(df_compras, df_ventas):
-    resumen_compras = df_compras.groupby('Ticker').agg({'Cantidad': 'sum', 'Precio de Transacción': 'mean'}).reset_index()
-    resumen_compras['Precio de Transacción'] = resumen_compras['Precio de Transacción'].round(2)
-    resumen_compras['Total Acciones'] = resumen_compras['Ticker'].apply(obtener_acciones_totales)
-    resumen_compras['Porcentaje Comprado'] = resumen_compras.apply(
-        lambda row: (row['Cantidad'] / row['Total Acciones'] * 100) if row['Total Acciones'] > 0 else 0,
-        axis=1
-    )
-    resumen_compras.columns = ['Ticker', 'Total Comprado', 'Precio Medio Compra', 'Porcentaje Comprado', 'Total Acciones']
-    resumen_compras = resumen_compras[['Ticker', 'Total Comprado', 'Precio Medio Compra', 'Porcentaje Comprado', 'Total Acciones']]
+    def calcular_porcentaje(cantidad, total_acciones):
+        return (abs((cantidad) / (total_acciones))* 100) if total_acciones > 0 else 0
+
     
-    resumen_ventas = df_ventas.groupby('Ticker').agg({'Cantidad': 'sum', 'Precio de Transacción': 'mean'}).reset_index()
-    resumen_ventas['Precio de Transacción'] = resumen_ventas['Precio de Transacción'].round(2)
-    resumen_ventas['Total Acciones'] = resumen_ventas['Ticker'].apply(obtener_acciones_totales)
-    resumen_ventas['Porcentaje Vendido'] = resumen_ventas.apply(
-        lambda row: (abs(row['Cantidad']) / row['Total Acciones'] * 100) if row['Total Acciones'] > 0 else 0,
-        axis=1
-    )
-    resumen_ventas.columns = ['Ticker', 'Total Vendido', 'Precio Medio Venta', 'Porcentaje Vendido', 'Total Acciones']
-    resumen_ventas = resumen_ventas[['Ticker', 'Total Vendido', 'Precio Medio Venta', 'Porcentaje Vendido', 'Total Acciones']]
-    
+    def procesar_resumen(df, tipo):
+        resumen = df.groupby('Ticker').agg({'Cantidad': 'sum', 'Precio de Transacción': 'mean'}).reset_index()
+        
+        # Redondear el precio de transacción
+        resumen['Precio de Transacción'] = resumen['Precio de Transacción'].round(2)
+        
+        # Obtener total de acciones para cada ticker
+        resumen['Total Acciones'] = resumen['Ticker'].apply(obtener_acciones_totales)
+        
+        # Calcular porcentaje comprado o vendido
+        resumen[f'Porcentaje {tipo}'] = resumen.apply(
+            lambda row: calcular_porcentaje(row['Cantidad'], row['Total Acciones']),
+            axis=1
+        )
+        
+        # Renombrar las columnas para claridad en el resumen
+        resumen.columns = ['Ticker', f'Total {tipo}', f'Precio Medio {tipo}', f'Porcentaje {tipo}', 'Total Acciones']
+        
+        # Redondear el porcentaje para mantener consistencia en los decimales
+        resumen[f'Porcentaje {tipo}'] = resumen[f'Porcentaje {tipo}'].round(2)
+        
+        return resumen[['Ticker', f'Total {tipo}', f'Precio Medio {tipo}', f'Porcentaje {tipo}', 'Total Acciones']]
+
+    # Crear los resúmenes de compras y ventas
+    resumen_compras = procesar_resumen(df_compras, 'Comprado')
+    resumen_ventas = procesar_resumen(df_ventas, 'Vendido')
+
     logging.info("Resúmenes de compras y ventas creados correctamente.")
+    
     return resumen_compras, resumen_ventas
 
 # Función para obtener transacciones de múltiples tickers
@@ -133,7 +142,8 @@ def dividir_compras_ventas(df):
     return df_compras, df_ventas
 
 # Función para filtrar transacciones por fecha
-def filtrar_por_fecha(df, dias=15):
+days = 15
+def filtrar_por_fecha(df, dias=days):
     fecha_limite = (datetime.now() - timedelta(days=dias)).date()
     df['Fecha de Transacción'] = pd.to_datetime(df['Fecha de Transacción']).dt.date
     df_filtrado = df[df['Fecha de Transacción'] >= fecha_limite]
@@ -187,6 +197,5 @@ def automatizar_proceso(tickers):
         logging.error(f"Error en el proceso de automatización: {e}")
 
 automatizar_proceso(tickers)
-
 
 
