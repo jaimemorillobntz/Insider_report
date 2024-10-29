@@ -12,7 +12,7 @@ import json
 
 # Configuración de logging
 logging.basicConfig(
-    filename='insider_trading.log',  # Archivo donde se guardarán los logs
+    filename='insider_trading_secrets.log',  # Archivo donde se guardarán los logs
     level=logging.INFO,  # Nivel de logging
     format='%(asctime)s - %(levelname)s - %(message)s'  # Formato de los logs
 )
@@ -227,9 +227,12 @@ def automatizar_proceso(tickers):
         
         # Paso 3: Obtener total de acciones
         total_acciones = obtener_acciones_totales(tickers)
-        if not total_acciones:
-            logging.error("Error: total_acciones está vacío. Revisa la función obtener_acciones_totales.")
-            return  # Salimos del proceso si total_acciones está vacío para evitar errores
+        
+        # Verificar el contenido de `total_acciones`
+        logging.debug(f"Contenido de total_acciones antes de crear el resumen: {total_acciones}")
+        if not total_acciones or all(v == 0 for v in total_acciones.values()):
+            logging.error("Error: total_acciones está vacío o tiene valores nulos.")
+            return  # Salimos del proceso si total_acciones está vacío o con valores nulos
 
         # Paso 4: Crear resúmenes de compras y ventas con el total de acciones
         resumen_compras, resumen_ventas = crear_resumen(df_compras, df_ventas, total_acciones)
@@ -239,6 +242,9 @@ def automatizar_proceso(tickers):
         logging.info("Proceso de automatización completado exitosamente.")
     except Exception as e:
         logging.error(f"Error en el proceso de automatización: {e}")
+        
+# Llamar a la función de automatización
+automatizar_proceso(tickers)
 
 
 
