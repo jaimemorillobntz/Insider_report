@@ -117,43 +117,39 @@ def obtener_acciones_totales(tickers):
 
     return resultados
 
-# Función para crear resúmenes de compras y ventas
 def crear_resumen(df_compras, df_ventas, total_acciones):
     def calcular_porcentaje(cantidad, total_acciones):
-        # Calculo el porcentaje en relación al total de acciones
         return ((abs(cantidad) / total_acciones)) * 100 if total_acciones > 0 else 0
 
     def procesar_resumen(df, tipo):
-        # Agrupo por ticker y calculo el total y el precio medio de transacción
-        resumen = df.groupby('Ticker').agg({'Cantidad': 'sum', 'Precio de Transacción': 'mean'}).reset_index()
-        resumen['Precio de Transacción'] = resumen['Precio de Transacción'].round(2)
+        # Agrupa y calcula total y precio medio
+        resumen = df.groupby('Ticker').agg({
+            'Cantidad': 'sum', 
+            'Precio de Transacción': 'mean'
+        }).reset_index()
         
-        # Asignar total de acciones desde el diccionario
-        resumen['Total Acciones'] = resumen['Ticker'].apply(lambda x: total_acciones.get(x, 0))
+        # Redondea el precio medio
+        resumen['Precio Medio'] = resumen['Precio de Transacción'].round(2)
 
-        # Calculo el porcentaje en base al total de acciones para cada ticker
+        # Mapea el total de acciones y calcula porcentaje
+        resumen['Total Acciones'] = resumen['Ticker'].map(total_acciones).fillna(0).astype(int)
         resumen[f'Porcentaje {tipo}'] = resumen.apply(
-            lambda row: calcular_porcentaje(row['Cantidad'], row['Total Acciones']),
-            axis=1
-        )
-    
-        # Redondeo los valores del porcentaje para mayor claridad
-        resumen[f'Porcentaje {tipo}'] = resumen[f'Porcentaje {tipo}'].round(5)
+            lambda row: calcular_porcentaje(row['Cantidad'], row['Total Acciones']), axis=1
+        ).round(5)
         
-        # Renombro las columnas según el tipo (Comprado o Vendido) y ajusto el orden
-        resumen.columns = ['Ticker', f'Total {tipo}', f'Precio Medio {tipo}', 'Total Acciones', f'Porcentaje {tipo}']
+        # Renombra columnas para claridad y coloca en el orden deseado
+        resumen.columns = [
+            'Ticker', f'Total {tipo}', 'Precio de Transacción', 'Precio Medio', 'Total Acciones', f'Porcentaje {tipo}'
+        ]
+        
+        # Retorna columnas en el orden correcto
+        return resumen[['Ticker', f'Total {tipo}', 'Precio Medio', f'Porcentaje {tipo}', 'Total Acciones']]
 
-        # Retorno solo las columnas deseadas en el orden correcto (porcentaje primero)
-        return resumen[['Ticker', f'Total {tipo}', f'Precio Medio {tipo}', f'Porcentaje {tipo}', 'Total Acciones']]
-
-    # Creo los resúmenes de compras y ventas aplicando la función procesada
     resumen_compras = procesar_resumen(df_compras, 'Comprado')
     resumen_ventas = procesar_resumen(df_ventas, 'Vendido')
-
-    logging.info("Resúmenes de compras y ventas creados correctamente.")
     
+    logging.info("Resúmenes de compras y ventas creados correctamente.")
     return resumen_compras, resumen_ventas
-
 
 # Función para obtener transacciones de múltiples tickers
 def obtener_transacciones_multiples_tickers(tickers):
