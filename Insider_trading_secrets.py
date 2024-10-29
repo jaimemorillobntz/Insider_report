@@ -71,42 +71,51 @@ def obtener_transacciones_insiders(ticker):
         return pd.DataFrame()
 
 
-def obtener_acciones_totales(ticker):
-    accion = yf.Ticker(ticker)
-    try:
-        # 1. Intenta obtener `sharesOutstanding`, que es el más confiable.
-        total_acciones = accion.info.get('sharesOutstanding')
-        if total_acciones is not None:
-            logging.info(f"Total de acciones ('sharesOutstanding') obtenido para {ticker}: {total_acciones}")
-            return total_acciones
-        
-        # 2. Si `sharesOutstanding` es None, intenta con `totalSharesOutstanding`.
-        total_acciones = accion.info.get('totalSharesOutstanding')
-        if total_acciones is not None:
-            logging.info(f"Total de acciones ('totalSharesOutstanding') obtenido para {ticker}: {total_acciones}")
-            return total_acciones
-        
-        # 3. Si `totalSharesOutstanding` también es None, intenta con `floatShares`.
-        total_acciones = accion.info.get('floatShares')
-        if total_acciones is not None:
-            logging.info(f"Total de acciones ('floatShares') obtenido para {ticker}: {total_acciones}")
-            return total_acciones
-        
-        # 4. Si `floatShares` es None, calcula estimación usando `marketCap` / `currentPrice`.
-        market_cap = accion.info.get('marketCap')
-        current_price = accion.info.get('currentPrice')
-        if market_cap is not None and current_price is not None:
-            total_acciones_calculado = market_cap / current_price
-            logging.info(f"Estimación de acciones calculada para {ticker} usando 'marketCap' y 'currentPrice': {total_acciones_calculado}")
-            return int(total_acciones_calculado)
+# Función para obtener acciones totales para múltiples tickers
+def obtener_acciones_totales(tickers):
+    resultados = {}
+    for ticker in tickers:
+        accion = yf.Ticker(ticker)
+        try:
+            # 1. Intenta obtener `sharesOutstanding`, que es el más confiable.
+            total_acciones = accion.info.get('sharesOutstanding')
+            if total_acciones is not None:
+                logging.info(f"Total de acciones ('sharesOutstanding') obtenido para {ticker}: {total_acciones}")
+                resultados[ticker] = total_acciones
+                continue
+            
+            # 2. Si `sharesOutstanding` es None, intenta con `totalSharesOutstanding`.
+            total_acciones = accion.info.get('totalSharesOutstanding')
+            if total_acciones is not None:
+                logging.info(f"Total de acciones ('totalSharesOutstanding') obtenido para {ticker}: {total_acciones}")
+                resultados[ticker] = total_acciones
+                continue
+            
+            # 3. Si `totalSharesOutstanding` también es None, intenta con `floatShares`.
+            total_acciones = accion.info.get('floatShares')
+            if total_acciones is not None:
+                logging.info(f"Total de acciones ('floatShares') obtenido para {ticker}: {total_acciones}")
+                resultados[ticker] = total_acciones
+                continue
+            
+            # 4. Si `floatShares` es None, calcula estimación usando `marketCap` / `currentPrice`.
+            market_cap = accion.info.get('marketCap')
+            current_price = accion.info.get('currentPrice')
+            if market_cap is not None and current_price is not None:
+                total_acciones_calculado = market_cap / current_price
+                logging.info(f"Estimación de acciones calculada para {ticker} usando 'marketCap' y 'currentPrice': {total_acciones_calculado}")
+                resultados[ticker] = int(total_acciones_calculado)
+                continue
 
-        # Si ninguna de las opciones devuelve un valor, lanza una advertencia y retorna 0.
-        logging.warning(f"No se encontró información sobre el total de acciones para {ticker}. Valor predeterminado usado.")
-        return 0
-        
-    except Exception as e:
-        logging.error(f"Error desconocido al obtener el número total de acciones para {ticker}: {e}")
-        return 0
+            # Si ninguna de las opciones devuelve un valor, lanza una advertencia y retorna 0.
+            logging.warning(f"No se encontró información sobre el total de acciones para {ticker}. Valor predeterminado usado.")
+            resultados[ticker] = 0
+            
+        except Exception as e:
+            logging.error(f"Error desconocido al obtener el número total de acciones para {ticker}: {e}")
+            resultados[ticker] = f"Error: {str(e)}"
+
+    return resultados
 
 # Función para crear resúmenes de compras y ventas
 def crear_resumen(df_compras, df_ventas):
@@ -211,6 +220,10 @@ def automatizar_proceso(tickers):
         df_compras = formatear_fecha(df_compras)
         df_ventas = formatear_fecha(df_ventas)
         resumen_compras, resumen_ventas = crear_resumen(df_compras, df_ventas)
+
+        # Obtener el total de acciones para todos los tickers
+        total_acciones = obtener_acciones_totales(tickers)
+        
         guardar_en_google_sheets(df_compras, df_ventas, resumen_compras, resumen_ventas)
         logging.info("Proceso de automatización completado exitosamente.")
     except Exception as e:
