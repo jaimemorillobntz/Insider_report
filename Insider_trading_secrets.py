@@ -74,50 +74,70 @@ def obtener_transacciones_insiders(ticker):
 def obtener_acciones_totales(ticker):
     accion = yf.Ticker(ticker)
     try:
-        # Verifica si la clave 'sharesOutstanding' está en la info
-        total_acciones = accion.info.get('sharesOutstanding', None)
-        if total_acciones is None:
-            logging.warning(f"No se encontró 'sharesOutstanding' para {ticker}. Valor predeterminado usado.")
-            return 0  # Devuelve un valor predeterminado o maneja según sea necesario
-        logging.info(f"Total de acciones obtenido para {ticker}: {total_acciones}")
-        return total_acciones
-    except json.JSONDecodeError:
-        logging.error(f"Error de decodificación JSON para {ticker}.")
-        return 0  # Valor predeterminado en caso de error
+        # 1. Intenta obtener `sharesOutstanding`, que es el más confiable.
+        total_acciones = accion.info.get('sharesOutstanding')
+        if total_acciones is not None:
+            logging.info(f"Total de acciones ('sharesOutstanding') obtenido para {ticker}: {total_acciones}")
+            return total_acciones
+        
+        # 2. Si `sharesOutstanding` es None, intenta con `totalSharesOutstanding`.
+        total_acciones = accion.info.get('totalSharesOutstanding')
+        if total_acciones is not None:
+            logging.info(f"Total de acciones ('totalSharesOutstanding') obtenido para {ticker}: {total_acciones}")
+            return total_acciones
+        
+        # 3. Si `totalSharesOutstanding` también es None, intenta con `floatShares`.
+        total_acciones = accion.info.get('floatShares')
+        if total_acciones is not None:
+            logging.info(f"Total de acciones ('floatShares') obtenido para {ticker}: {total_acciones}")
+            return total_acciones
+        
+        # 4. Si `floatShares` es None, calcula estimación usando `marketCap` / `currentPrice`.
+        market_cap = accion.info.get('marketCap')
+        current_price = accion.info.get('currentPrice')
+        if market_cap is not None and current_price is not None:
+            total_acciones_calculado = market_cap / current_price
+            logging.info(f"Estimación de acciones calculada para {ticker} usando 'marketCap' y 'currentPrice': {total_acciones_calculado}")
+            return int(total_acciones_calculado)
+
+        # Si ninguna de las opciones devuelve un valor, lanza una advertencia y retorna 0.
+        logging.warning(f"No se encontró información sobre el total de acciones para {ticker}. Valor predeterminado usado.")
+        return 0
+        
     except Exception as e:
         logging.error(f"Error desconocido al obtener el número total de acciones para {ticker}: {e}")
         return 0
 
-# Función para crear resúmenes
+# Función para crear resúmenes de compras y ventas
 def crear_resumen(df_compras, df_ventas):
     def calcular_porcentaje(cantidad, total_acciones):
-        return (abs((cantidad) / (total_acciones))* 100) if total_acciones > 0 else 0
+        # Calculo el porcentaje en relación al total de acciones
+        return ((abs(cantidad) / total_acciones)) * 100 if total_acciones > 0 else 0
 
-    
     def procesar_resumen(df, tipo):
+        # Agrupo por ticker y calculo el total y el precio medio de transacción
         resumen = df.groupby('Ticker').agg({'Cantidad': 'sum', 'Precio de Transacción': 'mean'}).reset_index()
-        
-        # Redondear el precio de transacción
         resumen['Precio de Transacción'] = resumen['Precio de Transacción'].round(2)
         
-        # Obtener total de acciones para cada ticker
-        resumen['Total Acciones'] = resumen['Ticker'].apply(obtener_acciones_totales)
+        # Agrego la columna de total de acciones utilizando la función obtener_acciones_totales()
+        resumen['Total Acciones'] = resumen['Ticker'].apply(lambda x: obtener_acciones_totales(x) or 0)
         
-        # Calcular porcentaje comprado o vendido
+        # Calculo el porcentaje en base al total de acciones para cada ticker
         resumen[f'Porcentaje {tipo}'] = resumen.apply(
             lambda row: calcular_porcentaje(row['Cantidad'], row['Total Acciones']),
             axis=1
         )
+    
+        # Redondeo los valores del porcentaje para mayor claridad
+        resumen[f'Porcentaje {tipo}'] = resumen[f'Porcentaje {tipo}'].round(5)
         
-        # Renombrar las columnas para claridad en el resumen
+        # Renombro las columnas según el tipo (Comprado o Vendido)
         resumen.columns = ['Ticker', f'Total {tipo}', f'Precio Medio {tipo}', f'Porcentaje {tipo}', 'Total Acciones']
-        
-        # Redondear el porcentaje para mantener consistencia en los decimales
-        resumen[f'Porcentaje {tipo}'] = resumen[f'Porcentaje {tipo}'].round(2)
-        
+
+        # Retorno solo las columnas deseadas en el orden correcto
         return resumen[['Ticker', f'Total {tipo}', f'Precio Medio {tipo}', f'Porcentaje {tipo}', 'Total Acciones']]
 
-    # Crear los resúmenes de compras y ventas
+    # Creo los resúmenes de compras y ventas aplicando la función procesada
     resumen_compras = procesar_resumen(df_compras, 'Comprado')
     resumen_ventas = procesar_resumen(df_ventas, 'Vendido')
 
@@ -180,7 +200,7 @@ def guardar_en_google_sheets(df_compras, df_ventas, resumen_compras, resumen_ven
         logging.error(f"Error al guardar en Google Sheets: {e}")
 
 # Ejemplo de uso con varios tickers
-tickers = ['ASML','ULTA','TXN','POOL','MSFT', 'MC','DHR','AAPL','SOM']
+tickers = ['ASML','ULTA','TXN','POOL','MSFT', 'MC','DHR','AAPL','SOM','NVDA']
 
 def automatizar_proceso(tickers):
     try:
