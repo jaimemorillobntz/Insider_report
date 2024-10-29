@@ -220,16 +220,15 @@ def automatizar_proceso(tickers):
         df_ventas = filtrar_por_fecha(df_ventas)
         df_compras = formatear_fecha(df_compras)
         df_ventas = formatear_fecha(df_ventas)
-        resumen_compras, resumen_ventas = crear_resumen(df_compras, df_ventas)
-
-        # Obtener el total de acciones para todos los tickers
         total_acciones = obtener_acciones_totales(tickers)
+        resumen_compras, resumen_ventas = crear_resumen(df_compras, df_ventas, total_acciones)
 
         guardar_en_google_sheets(df_compras, df_ventas, resumen_compras, resumen_ventas)
         logging.info("Proceso de automatización completado exitosamente.")
     except Exception as e:
         logging.error(f"Error en el proceso de automatización: {e}")
 
+# Ejecutar el proceso
 automatizar_proceso(tickers)
 
 

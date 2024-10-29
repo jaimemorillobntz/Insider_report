@@ -143,43 +143,6 @@ def crear_resumen(df_compras, df_ventas, total_acciones):
         resumen.columns = ['Ticker', f'Total {tipo}', f'Precio Medio {tipo}', 'Total Acciones', f'Porcentaje {tipo}']
 
         # Retorno solo las columnas deseadas en el orden correcto (porcentaje primero)
-        return resumen[['Ticker', f'Porcentaje {tipo}', f'Total {tipo}', f'Precio Medio {tipo}', 'Total Acciones']]
-
-    # Creo los resúmenes de compras y ventas aplicando la función procesada
-    resumen_compras = procesar_resumen(df_compras, 'Comprado')
-    resumen_ventas = procesar_resumen(df_ventas, 'Vendido')
-
-    logging.info("Resúmenes de compras y ventas creados correctamente.")
-    
-    return resumen_compras, resumen_ventas
-
-# Función para crear resúmenes de compras y ventas
-def crear_resumen(df_compras, df_ventas, total_acciones):
-    def calcular_porcentaje(cantidad, total_acciones):
-        # Calculo el porcentaje en relación al total de acciones
-        return ((abs(cantidad) / total_acciones)) * 100 if total_acciones > 0 else 0
-
-    def procesar_resumen(df, tipo):
-        # Agrupo por ticker y calculo el total y el precio medio de transacción
-        resumen = df.groupby('Ticker').agg({'Cantidad': 'sum', 'Precio de Transacción': 'mean'}).reset_index()
-        resumen['Precio de Transacción'] = resumen['Precio de Transacción'].round(2)
-        
-        # Asignar total de acciones desde el diccionario
-        resumen['Total Acciones'] = resumen['Ticker'].apply(lambda x: total_acciones.get(x, 0))
-
-        # Calculo el porcentaje en base al total de acciones para cada ticker
-        resumen[f'Porcentaje {tipo}'] = resumen.apply(
-            lambda row: calcular_porcentaje(row['Cantidad'], row['Total Acciones']),
-            axis=1
-        )
-    
-        # Redondeo los valores del porcentaje para mayor claridad
-        resumen[f'Porcentaje {tipo}'] = resumen[f'Porcentaje {tipo}'].round(5)
-        
-        # Renombro las columnas según el tipo (Comprado o Vendido) y ajusto el orden
-        resumen.columns = ['Ticker', f'Total {tipo}', f'Precio Medio {tipo}', 'Total Acciones', f'Porcentaje {tipo}']
-
-        # Retorno solo las columnas deseadas en el orden correcto (porcentaje primero)
         return resumen[['Ticker', f'Total {tipo}', f'Precio Medio {tipo}', f'Porcentaje {tipo}', 'Total Acciones']]
 
     # Creo los resúmenes de compras y ventas aplicando la función procesada
@@ -245,7 +208,7 @@ def guardar_en_google_sheets(df_compras, df_ventas, resumen_compras, resumen_ven
         logging.error(f"Error al guardar en Google Sheets: {e}")
 
 # Ejemplo de uso con varios tickers
-tickers = ['ASML','ULTA','TXN','POOL','MSFT', 'MC','DHR','AAPL','SOM','NVDA','AAPL']
+tickers = ['ASML','ULTA','TXN','POOL','MSFT', 'MC','DHR','AAPL','SOM','NVDA','AAPL','GOOGL']
 
 def automatizar_proceso(tickers):
     try:
@@ -255,11 +218,9 @@ def automatizar_proceso(tickers):
         df_ventas = filtrar_por_fecha(df_ventas)
         df_compras = formatear_fecha(df_compras)
         df_ventas = formatear_fecha(df_ventas)
-
-        # Obtener el total de acciones para todos los tickers
         total_acciones = obtener_acciones_totales(tickers)
-
         resumen_compras, resumen_ventas = crear_resumen(df_compras, df_ventas, total_acciones)
+
         guardar_en_google_sheets(df_compras, df_ventas, resumen_compras, resumen_ventas)
         logging.info("Proceso de automatización completado exitosamente.")
     except Exception as e:
