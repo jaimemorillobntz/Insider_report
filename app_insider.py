@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from Insider_trading_secrets import obtener_transacciones_insiders, dividir_compras_ventas, filtrar_por_fecha, formatear_fecha, crear_resumen
+from Insider_trading_secrets import obtener_transacciones_insiders, dividir_compras_ventas, filtrar_por_fecha, formatear_fecha, obtener_acciones_totales, crear_resumen
 
 # Título de la aplicación
 st.title('Análisis de Transacciones de Insiders')
@@ -51,7 +51,8 @@ if st.button('Cargar datos'):
         df_ventas = formatear_fecha(df_ventas)
         
         # Crear resúmenes
-        resumen_compras, resumen_ventas = crear_resumen(df_compras, df_ventas)
+        total_acciones = obtener_acciones_totales(tickers)
+        resumen_compras, resumen_ventas = crear_resumen(df_compras, df_ventas, total_acciones)
         
         # Eliminar índices antes de mostrar
         df_compras = df_compras.reset_index(drop=True)
@@ -71,5 +72,7 @@ if st.button('Cargar datos'):
 
         st.subheader("Resumen de Ventas")
         st.dataframe(resumen_ventas)
-    else:
-        st.warning("No se encontraron transacciones para los tickers seleccionados.")
+    # AÑADIR ESPECIFICACIÓN DF EMPTY NO HAY TRANSACCIONES O LOS DIRECTIVOS DE TU EMPRESA NO TIENE QUE RELLENAR EL FORMULARIO DE LA SEC
+else:
+    st.warning("No se encontraron transacciones para los tickers seleccionados o los directivos de tu empresa no tienen que rellenar el formulario de la SEC.")
+
