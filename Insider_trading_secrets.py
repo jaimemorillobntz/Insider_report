@@ -17,7 +17,6 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'  # Formato de los logs
 )
 
-
 api_key = st.secrets["Finnhub_API"]
 
 # Autenticación con Google Sheets
