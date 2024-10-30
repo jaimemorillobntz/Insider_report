@@ -1,8 +1,7 @@
 import requests
 import pandas as pd
-from dotenv import load_dotenv  
+from dotenv import load_dotenv
 from datetime import datetime, timedelta
-import yfinance as yf
 import gspread
 from gspread_dataframe import set_with_dataframe
 from oauth2client.service_account import ServiceAccountCredentials
@@ -17,7 +16,6 @@ logging.basicConfig(
     level=logging.INFO,  # Nivel de logging
     format='%(asctime)s - %(levelname)s - %(message)s'  # Formato de los logs
 )
-
 
 api_key = st.secrets["Finnhub_API"]
 
@@ -58,7 +56,7 @@ def obtener_transacciones_insiders(ticker):
         df = pd.DataFrame(data)
         df = df[df['transactionCode'].isin(['P', 'S'])]
         columnas_necesarias = ['name', 'change', 'transactionPrice', 'share', 'transactionDate']
-        df_limpio = df[columnas_necesarias].copy()  # Asegúrate de hacer una copia
+        df_limpio = df[columnas_necesarias]
         df_limpio.columns = ['Nombre', 'Cantidad', 'Precio de Transacción', 'Restantes', 'Fecha de Transacción']
         df_limpio['Nombre'] = df_limpio['Nombre'].apply(lambda x: invertir_nombre(x).title())
         df_limpio['Ticker'] = ticker
@@ -71,51 +69,17 @@ def obtener_transacciones_insiders(ticker):
         logging.error(f"Error desconocido para {ticker}: {e}")
         return pd.DataFrame()
 
-# Función para obtener acciones totales para múltiples tickers
+# Función para obtener total de acciones para múltiples tickers
 def obtener_acciones_totales(tickers):
     resultados = {}
     for ticker in tickers:
-        accion = yf.Ticker(ticker)
         try:
-            # 1. Intenta obtener `sharesOutstanding`, que es el más confiable.
-            total_acciones = accion.info.get('sharesOutstanding')
-            if total_acciones is not None:
-                logging.info(f"Total de acciones ('sharesOutstanding') obtenido para {ticker}: {total_acciones}")
-                resultados[ticker] = total_acciones
-                time.sleep(1)
-                continue
-            
-            # 2. Si `sharesOutstanding` es None, intenta con `totalSharesOutstanding`.
-            total_acciones = accion.info.get('totalSharesOutstanding')
-            if total_acciones is not None:
-                logging.info(f"Total de acciones ('totalSharesOutstanding') obtenido para {ticker}: {total_acciones}")
-                resultados[ticker] = total_acciones
-                time.sleep(1)
-                continue
-            
-            # 3. Si `totalSharesOutstanding` también es None, intenta con `floatShares`.
-            total_acciones = accion.info.get('floatShares')
-            if total_acciones is not None:
-                logging.info(f"Total de acciones ('floatShares') obtenido para {ticker}: {total_acciones}")
-                resultados[ticker] = total_acciones
-                time.sleep(1)
-                continue
-            
-            # 4. Si `floatShares` es None, calcula estimación usando `marketCap` / `currentPrice`.
-            market_cap = accion.info.get('marketCap')
-            current_price = accion.info.get('currentPrice')
-            if market_cap is not None and current_price is not None:
-                total_acciones_calculado = market_cap / current_price
-                logging.info(f"Estimación de acciones calculada para {ticker} usando 'marketCap' y 'currentPrice': {total_acciones_calculado}")
-                resultados[ticker] = int(total_acciones_calculado)
-                time.sleep(1)
-                continue
-
-            # Si ninguna de las opciones devuelve un valor, lanza una advertencia y retorna 0.
-            logging.warning(f"No se encontró información sobre el total de acciones para {ticker}. Valor predeterminado usado.")
-            resultados[ticker] = 0
+            # Colocar un valor predeterminado para cada ticker
+            # o una advertencia que solicite datos de otra fuente
+            logging.warning(f"No se obtuvo el total de acciones para {ticker}; por favor, verificar manualmente.")
+            resultados[ticker] = 0  # Predeterminado a 0; cambiar si se cuenta con otra fuente de datos
             time.sleep(1)
-            
+
         except Exception as e:
             logging.error(f"Error desconocido al obtener el número total de acciones para {ticker}: {e}")
             resultados[ticker] = f"Error: {str(e)}"
@@ -222,7 +186,7 @@ def automatizar_proceso(tickers):
         df_compras, df_ventas = dividir_compras_ventas(df_transacciones)
         
         # Verificación de datos en df_compras y df_ventas
-        if df_compras.empty or df_ventas.empty:
+        if df_compras.empty and df_ventas.empty:
             logging.warning("No hay datos en df_compras o df_ventas.")
             return
         
@@ -237,8 +201,6 @@ def automatizar_proceso(tickers):
         if not total_acciones:
             logging.error("total_acciones está vacío. Revisa la función obtener_acciones_totales.")
             return
-        # Impresión de depuración
-        logging.info(f"Total Acciones antes de crear resumen: {total_acciones}")
 
         # Paso 4: Crear resúmenes de compras y ventas con el total de acciones
         resumen_compras, resumen_ventas = crear_resumen(df_compras, df_ventas, total_acciones)
@@ -251,5 +213,3 @@ def automatizar_proceso(tickers):
 
 # Llamar a la función de automatización
 automatizar_proceso(tickers)
-
-
