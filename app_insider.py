@@ -72,7 +72,6 @@ if st.button('Cargar datos'):
 
         st.subheader("Resumen de Ventas")
         st.dataframe(resumen_ventas)
-    # AÑADIR ESPECIFICACIÓN DF EMPTY NO HAY TRANSACCIONES O LOS DIRECTIVOS DE TU EMPRESA NO TIENE QUE RELLENAR EL FORMULARIO DE LA SEC
 else:
     st.warning("No se encontraron transacciones para los tickers seleccionados o los directivos de tu empresa no tienen que rellenar el formulario de la SEC.")
 
