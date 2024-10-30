@@ -9,7 +9,6 @@ from oauth2client.service_account import ServiceAccountCredentials
 import logging
 import streamlit as st
 import json
-import time
 
 # Configuración de logging
 logging.basicConfig(
@@ -82,7 +81,6 @@ def obtener_acciones_totales(tickers):
             if total_acciones is not None:
                 logging.info(f"Total de acciones ('sharesOutstanding') obtenido para {ticker}: {total_acciones}")
                 resultados[ticker] = total_acciones
-                time.sleep(1)
                 continue
             
             # 2. Si `sharesOutstanding` es None, intenta con `totalSharesOutstanding`.
@@ -90,7 +88,6 @@ def obtener_acciones_totales(tickers):
             if total_acciones is not None:
                 logging.info(f"Total de acciones ('totalSharesOutstanding') obtenido para {ticker}: {total_acciones}")
                 resultados[ticker] = total_acciones
-                time.sleep(1)
                 continue
             
             # 3. Si `totalSharesOutstanding` también es None, intenta con `floatShares`.
@@ -98,7 +95,6 @@ def obtener_acciones_totales(tickers):
             if total_acciones is not None:
                 logging.info(f"Total de acciones ('floatShares') obtenido para {ticker}: {total_acciones}")
                 resultados[ticker] = total_acciones
-                time.sleep(1)
                 continue
             
             # 4. Si `floatShares` es None, calcula estimación usando `marketCap` / `currentPrice`.
@@ -108,18 +104,15 @@ def obtener_acciones_totales(tickers):
                 total_acciones_calculado = market_cap / current_price
                 logging.info(f"Estimación de acciones calculada para {ticker} usando 'marketCap' y 'currentPrice': {total_acciones_calculado}")
                 resultados[ticker] = int(total_acciones_calculado)
-                time.sleep(1)
                 continue
 
             # Si ninguna de las opciones devuelve un valor, lanza una advertencia y retorna 0.
             logging.warning(f"No se encontró información sobre el total de acciones para {ticker}. Valor predeterminado usado.")
             resultados[ticker] = 0
-            time.sleep(1)
             
         except Exception as e:
             logging.error(f"Error desconocido al obtener el número total de acciones para {ticker}: {e}")
             resultados[ticker] = f"Error: {str(e)}"
-            time.sleep(1)
 
     return resultados
 
