@@ -75,3 +75,9 @@ if st.button('Cargar datos'):
 else:
     st.warning("No se encontraron transacciones para los tickers seleccionados o los directivos de tu empresa no tienen que rellenar el formulario de la SEC.")
 
+# Agregar tu autoría y enlaces al final
+st.markdown("""
+    ---
+    **Creado por:** Jaime Morillo Benítez  
+    **Datos:** [LinkedIn](https://www.linkedin.com/in/jaime-morillo-benitez/) | [GitHub](https://github.com/jaimemorillobntz)
+    """, unsafe_allow_html=True)
