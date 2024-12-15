@@ -24,13 +24,13 @@ Este proyecto está diseñado para facilitar el análisis de las compras y venta
 
 Aquí hay algunas capturas de pantalla de la aplicación:
 
-### Web
+### Web Preview
 ![Pantalla inicial](images/Preview_web.png)
 
-### Ejemplo
+### Ejemplo 1
 ![Ejemplo de uso](images/Web_example1.png)
 
-### Ejemplo
+### Ejemplo 2
 ![Ejemplo de uso](images/Web_example2.png)
 
 Puedes instalar todas las dependencias necesarias ejecutando:
