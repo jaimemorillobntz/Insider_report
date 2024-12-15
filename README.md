@@ -20,6 +20,19 @@ Este proyecto está diseñado para facilitar el análisis de las compras y venta
 - **Streamlit** para la creación de la interfaz web interactiva.
 - **Pandas** para la manipulación y análisis de los datos.
 
+## Visualización Previa
+
+Aquí hay algunas capturas de pantalla de la aplicación:
+
+### Web
+![Pantalla inicial](images/Preview_web.png)
+
+### Ejemplo
+![Ejemplo de uso](images/Web_example1.png)
+
+### Ejemplo
+![Ejemplo de uso](images/Web_example2.png)
+
 Puedes instalar todas las dependencias necesarias ejecutando:
 
 ```bash
