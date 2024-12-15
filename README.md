@@ -20,13 +20,6 @@ Este proyecto está diseñado para facilitar el análisis de las compras y venta
 - **Streamlit** para la creación de la interfaz web interactiva.
 - **Pandas** para la manipulación y análisis de los datos.
 
-## Requisitos
-
-Para ejecutar este proyecto localmente, asegúrate de tener Python instalado. También necesitarás las siguientes librerías:
-
-- streamlit
-- pandas
-
 Puedes instalar todas las dependencias necesarias ejecutando:
 
 ```bash
